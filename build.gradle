@@ -3,8 +3,17 @@ plugins {
     id 'maven'
 }
 
+def getGitRevision = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-list', '--count', 'HEAD'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
 group 'kr.jclab.iaik'
-version '1.0.0'
+version = "1.0.${getGitRevision()}"
 
 sourceCompatibility = 1.8
 
