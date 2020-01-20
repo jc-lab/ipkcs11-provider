@@ -9,15 +9,21 @@ import java.util.List;
 
 public class SignatureService extends Provider.Service {
     private final long mechanism;
+    private final String digestAlgorithm;
+    private final Long signatureMechanism;
 
-    public SignatureService(Provider provider, String algorithm, Long mechanism) {
+    public SignatureService(Provider provider, String algorithm, String digestAlgorithm, Long signatureMechanism, Long mechanism) {
         super(provider, "Signature", algorithm, SignatureService.class.getName(), null, null);
         this.mechanism = mechanism;
+        this.digestAlgorithm = digestAlgorithm;
+        this.signatureMechanism = signatureMechanism;
     }
 
-    public SignatureService(Provider provider, String algorithm, Long mechanism, List<String> aliases) {
+    public SignatureService(Provider provider, String algorithm, String digestAlgorithm, Long signatureMechanism, Long mechanism, List<String> aliases) {
         super(provider, "Signature", algorithm, SignatureService.class.getName(), aliases, null);
         this.mechanism = mechanism;
+        this.digestAlgorithm = digestAlgorithm;
+        this.signatureMechanism = signatureMechanism;
     }
 
     private JsIaikPkcs11Provider getSelfProvider() {
@@ -26,6 +32,6 @@ public class SignatureService extends Provider.Service {
 
     @Override
     public Object newInstance(Object constructorParameter) throws NoSuchAlgorithmException {
-        return new SignatureSpiImpl(getSelfProvider(), getAlgorithm(), this.mechanism);
+        return new SignatureSpiImpl(getSelfProvider(), getAlgorithm(), this.digestAlgorithm, this.signatureMechanism, this.mechanism);
     }
 }
