@@ -35,7 +35,7 @@ public class WrappedPublicKey implements PublicKey {
 
     @Override
     public String getAlgorithm() {
-        return Pkcs11KeyUtils.getAlgorithm(this.p11PublicKey);
+        return Pkcs11KeyUtils.getAlgorithm(this.getP11PublicKey());
     }
 
     @Override
