@@ -27,7 +27,6 @@ dependencies {
 
     implementation('org.bouncycastle:bcprov-jdk15on:1.64')
     implementation('org.bouncycastle:bcpkix-jdk15on:1.64')
-    implementation('org.bouncycastle:bcpg-jdk15on:1.64')
     implementation('org.xipki.iaik:sunpkcs11-wrapper:1.4.6')
 }
 
