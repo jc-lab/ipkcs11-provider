@@ -1,25 +1,43 @@
 package kr.jclab.iaik.pkcs11.provider;
 
+import iaik.pkcs.pkcs11.Mechanism;
 import iaik.pkcs.pkcs11.Session;
+import iaik.pkcs.pkcs11.TokenException;
 import iaik.pkcs.pkcs11.wrapper.PKCS11Constants;
+import kr.jclab.iaik.pkcs11.provider.cipher.NoPaddingProvider;
+import kr.jclab.iaik.pkcs11.provider.cipher.PaddingProvider;
+import kr.jclab.iaik.pkcs11.provider.cipher.Pkcs7PaddingProvider;
+import kr.jclab.iaik.pkcs11.provider.service.CipherService;
+import kr.jclab.iaik.pkcs11.provider.service.KeyStoreService;
 import kr.jclab.iaik.pkcs11.provider.service.SignatureService;
 
 import java.lang.reflect.InvocationTargetException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.Provider;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class JsIaikPkcs11Provider extends Provider {
     private final Session session;
+    private final Set<Long> mechanismSet;
 
     public JsIaikPkcs11Provider(Session session) {
         super("JS_IAIK_PKCS11", 1.0, "JsIaikPkcs11 Provider");
 
         this.session = session;
+        Set<Long> mechanismSet = null;
+
+        try {
+            Set<Long> tempMechanismSet = new HashSet<>();
+            for(Mechanism m : this.session.getToken().getMechanismList()) {
+                tempMechanismSet.add(m.getMechanismCode());
+            }
+            mechanismSet = Collections.unmodifiableSet(tempMechanismSet);
+        } catch (TokenException e) {
+        }
+
+        this.mechanismSet = mechanismSet;
 
         AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
             setup();
@@ -39,6 +57,13 @@ public class JsIaikPkcs11Provider extends Provider {
     private final static List<String> pssSignatureSuffixes = Collections.unmodifiableList(Arrays.asList(
             "withRSA/PSS", "WithRSA/PSS", "withRSAandMGF1", "WithRSAandMGF1"
     ));
+
+    private boolean hasMechanism(long code) {
+        if(this.mechanismSet != null) {
+            return this.mechanismSet.contains(code);
+        }
+        return true;
+    }
 
     private void setup() {
         this.addSignatureWithAliases(SignatureService.class, "ECDSA", null, PKCS11Constants.CKM_ECDSA, PKCS11Constants.CKM_ECDSA);
@@ -84,6 +109,25 @@ public class JsIaikPkcs11Provider extends Provider {
         this.addSignatureWithSuffixes(SignatureService.class, "SHA3-256", PKCS11Constants.CKM_RSA_PKCS_PSS, PKCS11Constants.CKM_SHA3_256_RSA_PKCS_PSS, pssSignatureSuffixes);
         this.addSignatureWithSuffixes(SignatureService.class, "SHA3-384", PKCS11Constants.CKM_RSA_PKCS_PSS, PKCS11Constants.CKM_SHA3_384_RSA_PKCS_PSS, pssSignatureSuffixes);
         this.addSignatureWithSuffixes(SignatureService.class, "SHA3-512", PKCS11Constants.CKM_RSA_PKCS_PSS, PKCS11Constants.CKM_SHA3_512_RSA_PKCS_PSS, pssSignatureSuffixes);
+
+        this.putService(new KeyStoreService(this, "PKCS11", false));
+        this.putService(new KeyStoreService(this, "PKCS11-ID", true));
+
+        this.addCipher(CipherService.class, new String[] {
+                "AES", "AES/ECB/NoPadding"
+        }, PKCS11Constants.CKM_AES_ECB, 16, SingletoneHolder.PADDING_NO);
+
+        this.addCipher(CipherService.class, new String[] {
+                "AES/ECB/PKCS5Padding", "AES/ECB/PKCS7Padding"
+        }, PKCS11Constants.CKM_AES_ECB, 16, SingletoneHolder.PADDING_PKCS7);
+
+        this.addCipher(CipherService.class, new String[] {
+                "AES/CBC/NoPadding"
+        }, PKCS11Constants.CKM_AES_CBC, 16, SingletoneHolder.PADDING_NO);
+
+        this.addCipher(CipherService.class, new String[]{
+                "AES/CBC/PKCS5Padding", "AES/CBC/PKCS7Padding"
+        }, PKCS11Constants.CKM_AES_CBC, 16, SingletoneHolder.PADDING_PKCS7);
     }
 
     private void addSignatureWithAliases(Class<? extends Service> clazz, String name, String digestName, Long signatureMechanism, long mechanism, List<String> aliases) {
@@ -110,7 +154,24 @@ public class JsIaikPkcs11Provider extends Provider {
         }
     }
 
+    private void addCipher(Class<? extends Service> clazz, String[] algorithms, Long cipherMechanism, int fixedBlockSize, PaddingProvider paddingProvider) {
+        try {
+            for(String algo : algorithms) {
+                this.putService(clazz
+                        .getDeclaredConstructor(Provider.class, String.class, List.class, Long.class, Integer.class, PaddingProvider.class)
+                        .newInstance(this, algo, null, cipherMechanism, fixedBlockSize, paddingProvider));
+            }
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public Session getSession() {
         return this.session;
+    }
+
+    private static class SingletoneHolder {
+        public static final PaddingProvider PADDING_NO = new NoPaddingProvider();
+        public static final PaddingProvider PADDING_PKCS7 = new Pkcs7PaddingProvider();
     }
 }
