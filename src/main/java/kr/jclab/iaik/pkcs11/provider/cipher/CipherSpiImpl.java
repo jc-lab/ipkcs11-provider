@@ -213,8 +213,11 @@ public class CipherSpiImpl extends CipherSpi {
         public int doUpdate(byte[] input, int inOffset, int inLength, byte[] output, int outOffset, int outLength) throws TokenException {
             int updateLen = session.decryptUpdate(input, inOffset, inLength, output, outOffset, outLength);
             byte[] temp = paddingContext.doUpdate(output, outOffset, updateLen);
-            System.arraycopy(temp, 0, output, outOffset, temp.length);
-            return temp.length;
+            if(temp != null && temp.length > 0) {
+                System.arraycopy(temp, 0, output, outOffset, temp.length);
+                return temp.length;
+            }
+            return 0;
         }
 
         @Override
